@@ -37,7 +37,7 @@ npx playwright install
 
 ### Start Recording
 ```bash
-npx playwright codegen https://tigerlily-hub.staging-0-1-0.ideagendev.com/
+npx playwright codegen https://example.com/
 ```
 
 ### Run Tests
