@@ -1,0 +1,677 @@
+# Playwright Agent Rules - Essential Guide
+
+## 🚨 CRITICAL VISIBLE ELEMENT RULE 🚨
+
+**IF PROMPT MENTIONS "FILL" AND "VISIBLE ELEMENT ONLY" - ALWAYS ADD `:visible` SELECTOR!**
+
+### 🎯 MANDATORY VISIBLE ELEMENT HANDLING:
+```typescript
+// ✅ CORRECT - When prompt says "fill visible element only"
+await page.locator('input[name="username"]:visible').first().fill(email);
+await page.locator('input[name="password"]:visible').first().fill(password);
+await page.locator('input[type="submit"]:visible').first().click();
+
+// ❌ WRONG - Missing :visible when prompt specifies visible only
+await page.locator('input[name="username"]').first().fill(email);
+await page.getByPlaceholder('name@host.com').first().fill(email);
+```
+
+### When to Use `:visible` Selector:
+- **ALWAYS** when prompt explicitly mentions "visible element only"
+- **ALWAYS** when there are duplicate elements on page (hidden forms, etc.)
+- **ALWAYS** when MCP testing shows multiple elements with same attributes
+- **CRITICAL**: This overrides all other selector preferences when visibility is specified
+
+---
+
+## 🚨 CRITICAL TASK SCOPE RULE 🚨
+
+**ONLY CREATE EXACTLY WHAT THE USER REQUESTS - NO EXTRAS!**
+
+### ❌ DO NOT ADD:
+- Extra test cases beyond what user asked for
+- Comprehensive test suites when user wants simple code
+- Additional verification steps unless specifically requested
+- "Helpful" additions or extended functionality
+- Multiple test scenarios when user asked for one
+
+### ✅ EXAMPLES:
+- User: "Generate code to login" → Create ONE simple login test
+- User: "Test login flow" → Create ONE login test (not login + navigation + dashboard tests)
+- User: "Create comprehensive test suite" → Then create multiple tests
+
+**STICK TO EXACT SCOPE - ASK IF UNSURE!**
+
+---
+
+## Usage Context & Decision Framework
+
+### When to Use Playwright
+**ALWAYS ask yourself: What is the user requesting?**
+
+1. **🧪 TESTING SCENARIOS** - Create test files when user asks for:
+   - "Write a test for..."
+   - "Create test automation for..."
+   - "Test that the login works..."
+   - "Generate test cases..."
+
+2. **🤖 AUTOMATION SCENARIOS** - Use MCP browser tools when user asks for:
+   - "Navigate to X and do Y"
+   - "Fill out this form..."
+   - "Login to this website..."
+   - "Take a screenshot of..."
+   - "Click on X and verify Y appears"
+
+3. **📝 CODE EXAMPLES** - Provide code snippets when user asks for:
+   - "Show me how to..."
+   - "What's the code for..."
+   - "How do I select elements..."
+
+### Decision Matrix
+| User Request | Response Type | Tools to Use |
+|-------------|---------------|--------------|
+| "Test the login flow" | Test file | Write test file |
+| "Login to this site" | Browser automation | MCP browser tools |
+| "How to select buttons?" | Code example | Code snippets only |
+| "Create automation for..." | Could be either | Ask for clarification |
+
+## Test Organization & Structure (When Creating Tests)
+
+### File Organization
+- **Store all tests in `tests/` folder**
+- **Name files by system component** (not React component): `user-authentication.spec.ts`, `order-management.spec.ts`
+- **Group related tests** using `test.describe` blocks
+- **Use descriptive test names** that explain functionality being tested
+
+### Authentication State Management
+```typescript
+// Use storageState for auth across entire test suite
+test.describe('Dashboard Tests', () => {
+  test.use({ storageState: path.join(__dirname, '.auth/user.json') });
+  
+  test('should display user profile', async ({ page }) => {
+    // Test runs with authenticated state
+  });
+});
+```
+
+## Core Principles
+
+### 1. ELEMENT SELECTION PRIORITY (MANDATORY)
+**Always follow this exact order:**
+
+1. **🥇 MEANINGFUL ID SELECTORS** (Most reliable when IDs are not randomized)
+   ```typescript
+   page.locator('#loginForm')  // Use if ID looks meaningful, not like random numbers
+   page.locator('#signInFormUsername')  // Good - descriptive ID
+   page.locator('#nav-menu')  // Good - semantic ID
+   
+   // ❌ AVOID - Random/generated IDs
+   page.locator('#form-98234')  // Bad - looks like random number
+   page.locator('#input-xyz123')  // Bad - appears auto-generated
+   
+   // ID EVALUATION CRITERIA:
+   // ✅ USE: descriptive words (signInForm, navMenu, submitButton)
+   // ✅ USE: semantic names (username, password, email)
+   // ❌ AVOID: random numbers, hash-like strings, auto-generated IDs
+   ```
+
+2. **🥈 ROLE-BASED SELECTORS** (Excellent for accessibility)
+   ```typescript
+   page.getByRole('button', { name: 'Submit' }).first()
+   page.getByRole('textbox', { name: 'What needs to be done?' }).first()
+   
+   // DUPLICATE NAME HANDLING:
+   // When multiple elements have same name, prefer more specific selectors
+   page.getByRole('button', { name: 'Submit' }).first()  // Use .first() for duplicates
+   page.locator('form#loginForm button[type="submit"]')  // Use context for specificity
+   ```
+
+3. **🥉 SEMANTIC SELECTORS** (Good accessibility fallback)
+   ```typescript
+   page.getByText('Submit').first()
+   page.getByLabel('Email').first()
+   page.getByPlaceholder('Enter email').first()
+   ```
+
+4. **🏅 TEST ATTRIBUTES** (When semantic fails)
+   ```typescript
+   page.locator('[data-testid="submit-btn"]').first()
+   ```
+
+5. **🚨 GENERIC SELECTORS** (Last resort only)
+   ```typescript
+   page.locator('button[type="submit"]').first()
+   ```
+
+### 2. STRICT MODE COMPLIANCE (CRITICAL)
+**ALWAYS add `.first()` to prevent strict mode violations:**
+```typescript
+// ✅ CORRECT
+await page.getByRole('button', { name: 'Open' }).first().click();
+await page.locator('[data-id="button"]').first().click();
+
+// ❌ WRONG - Will fail with multiple elements
+await page.getByRole('button', { name: 'Open' }).click();
+```
+
+### 3. SMART WAITING (NO ARBITRARY TIMEOUTS)
+```typescript
+// ✅ GOOD - Network-aware waiting
+await page.waitForLoadState('networkidle');
+await page.waitForURL('**/dashboard**');
+
+// ❌ BAD - Arbitrary delays
+await page.waitForTimeout(5000);
+```
+
+### 4. DYNAMIC URL HANDLING
+```typescript
+// ✅ GOOD - Let app navigate naturally
+await page.goto('https://app.com'); // May redirect to auth
+// App handles redirects automatically
+
+// ❌ BAD - Hardcoded auth URLs
+await page.goto('https://auth.provider.com/login?params...');
+```
+
+## 🚨 CRITICAL MCP → TEST CODE GENERATION RULE 🚨
+
+### **MANDATORY: Always Use browser_evaluate to Inspect Elements**
+
+**Before generating ANY Playwright test code, ALWAYS use MCP browser_evaluate to get exact HTML structure:**
+
+```javascript
+// Step 1: Navigate to login form
+await mcp_playwright_browser_navigate({ url: 'https://example.com' });
+await mcp_playwright_browser_wait_for({ time: 3 });
+
+// Step 2: CRITICALLY IMPORTANT - Inspect actual elements
+await mcp_playwright_browser_evaluate({
+  function: `() => {
+    const inputs = Array.from(document.querySelectorAll('input'));
+    return inputs.map(input => ({
+      tagName: input.tagName,
+      type: input.type,
+      placeholder: input.placeholder,
+      id: input.id,
+      name: input.name,
+      className: input.className,
+      ariaLabel: input.getAttribute('aria-label'),
+      outerHTML: input.outerHTML.substring(0, 150)
+    }));
+  }`
+});
+
+// Step 3: Test exact MCP selectors that work
+await mcp_playwright_browser_type({
+  element: 'Email textbox',
+  ref: 'e19',  // Use MCP ref from snapshot
+  text: 'test@example.com'
+});
+```
+
+### **Key Translation Rule: MCP Selectors → Playwright Code**
+
+**🚨 CRITICAL: ALWAYS use getByRole with EXACT MCP ref names from browser snapshots:**
+
+```yaml
+# MCP Browser Snapshot Shows:
+textbox "Email" [ref=e19]
+  /placeholder: name@host.com
+button "submit" [ref=e25]
+
+# Playwright Test Code MUST Use EXACT role names from MCP:
+await page.getByRole('textbox', { name: 'Email' }).first().fill(email);
+await page.getByRole('button', { name: 'submit' }).first().click();
+
+# OR use placeholder/label if name is not accessible:
+await page.getByPlaceholder('name@host.com').first().fill(email);
+await page.getByPlaceholder('Password').first().fill(password);
+
+# NOT generic selectors like:
+# ❌ page.locator('#email') 
+# ❌ page.locator('input[type="email"]')
+```
+
+### **🚨 MANDATORY: Use MCP Ref Names in getByRole Selectors**
+
+**When MCP browser tools work with refs like `[ref=e19]`, you MUST use the EXACT role name from the MCP snapshot:**
+
+```typescript
+// ✅ CORRECT - Copy EXACT role names from MCP snapshots
+// MCP snapshot: textbox [ref=e19] with placeholder "name@host.com"
+await page.getByPlaceholder('name@host.com').first().fill(email);
+
+// MCP snapshot: textbox [ref=e22] with placeholder "Password"
+await page.getByPlaceholder('Password').first().fill(password);
+
+// MCP snapshot: button "submit" [ref=e25]
+await page.getByRole('button', { name: 'submit' }).first().click();
+
+// ✅ CORRECT - For link elements from MCP snapshots
+// MCP snapshot: link "Forgot your password?" [ref=e24]
+await page.getByRole('link', { name: 'Forgot your password?' }).first().click();
+
+// ✅ ALTERNATIVE - Use accessible names if available
+await page.getByRole('textbox', { name: 'Email' }).first().fill(email);
+await page.getByRole('textbox', { name: 'Password' }).first().fill(password);
+
+// ❌ WRONG - Generic selectors that don't match MCP findings
+await page.locator('#email').fill(email);                           // Generic ID
+await page.locator('input[type="email"]').fill(email);              // Generic type
+await page.getByRole('button', { name: 'Sign in' }).click();        // Wrong name
+```
+
+### **EXACT MCP → Playwright Translation Pattern**
+
+```typescript
+// STEP 1: Always get MCP snapshot first
+await mcp_playwright_browser_snapshot({});
+
+// STEP 2: Use EXACT selectors from snapshot in Playwright code
+// If MCP snapshot shows: textbox [ref=e19] /placeholder: name@host.com
+await page.getByPlaceholder('name@host.com').first().fill(email);
+
+// If MCP snapshot shows: button "submit" [ref=e25] 
+await page.getByRole('button', { name: 'submit' }).first().click();
+
+// STEP 3: Always add .first() for strict mode compliance
+// ✅ CORRECT
+await page.getByPlaceholder('name@host.com').first().fill(email);
+
+// ❌ WRONG - Missing .first()
+await page.getByPlaceholder('name@host.com').fill(email);
+```
+
+## MCP Browser Automation (For Interactive Tasks)
+
+### When Using MCP Browser Tools
+Use these patterns when performing actual browser automation (not testing):
+
+```typescript
+// Navigate to page
+await mcp_playwright_browser_navigate({ url: 'https://example.com' });
+
+// Take snapshot to see current state
+await mcp_playwright_browser_snapshot({});
+
+// MANDATORY: Inspect exact element structure
+await mcp_playwright_browser_evaluate({
+  function: '() => Array.from(document.querySelectorAll("input")).map(i => ({type: i.type, name: i.name, placeholder: i.placeholder}))'
+});
+
+// Fill form fields using role-based selectors from snapshot
+await mcp_playwright_browser_type({
+  element: 'Email textbox',
+  ref: 'e19',  // Use exact ref from snapshot
+  text: 'user@example.com'
+});
+
+// Click buttons using exact refs
+await mcp_playwright_browser_click({
+  element: 'Submit button',
+  ref: 'e25'  // Use exact ref from snapshot
+});
+
+// Take screenshot
+await mcp_playwright_browser_take_screenshot({
+  filename: 'result.png'
+});
+```
+
+### MCP vs Test Code
+- **MCP Tools**: For immediate browser automation and interaction
+- **Test Code**: For automated testing and verification  
+- **Code Examples**: For showing implementation patterns
+- **🚨 CRITICAL**: Always use `browser_evaluate` to bridge MCP → Playwright selectors
+
+## Session Management (For Tests Only)
+
+**ALWAYS clear session data before each test:**
+```typescript
+test.beforeEach(async ({ page, context }) => {
+  console.log('🧹 Clearing session data...');
+  
+  // Clear cookies
+  await context.clearCookies();
+  
+  // Clear storage
+  await page.goto('about:blank');
+  await page.evaluate(() => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (error) {
+      console.log('Storage clearing skipped:', error.message);
+    }
+  });
+  
+  console.log('✅ Session cleaned');
+});
+```
+
+## Assertions & Best Practices
+
+### Web-First Assertions (PREFERRED)
+```typescript
+// ✅ GOOD - Auto-waiting assertions
+await expect(page.getByRole('button')).toBeVisible();
+await expect(page.getByText('Success')).toHaveText('Operation completed');
+await expect(page.getByRole('listitem')).toHaveCount(3);
+
+// ❌ AVOID - Manual property checks
+const text = await page.getByText('Success').textContent();
+expect(text).toBe('Success');
+```
+
+### Test Focus & Isolation
+- **Test user-visible behavior**, not implementation details
+- **Ensure tests are isolated** - no shared state between tests
+- **Use dynamic test data** when possible
+- **Minimize `page.evaluate()`** - prefer Playwright built-in methods
+
+### Performance & Stability
+```typescript
+// For inherently slow tests
+test.slow();
+
+// For parallel execution
+test.describe.configure({ mode: 'parallel' });
+
+// For debugging specific tests
+test.only('focus on this test', async ({ page }) => {
+  // Test code
+});
+```
+
+## Test Structure Templates
+
+### Basic Test Structure
+```typescript
+import { test, expect } from '@playwright/test';
+import path from 'path';
+
+const authFile = path.join(__dirname, '.auth/user.json');
+
+test.describe('Feature Name', () => {
+  // Use auth state for entire suite
+  test.use({ storageState: authFile });
+  
+  // Common setup for all tests
+  test.beforeEach(async ({ page }) => {
+    await page.goto('https://app.com/feature');
+  });
+
+  test('should perform specific action', async ({ page }) => {
+    // Step 1: Interact (role-based selectors + .first())
+    await page.getByRole('textbox', { name: 'What needs to be done?' }).fill('New task');
+    await page.getByRole('textbox', { name: 'What needs to be done?' }).press('Enter');
+    
+    // Step 2: Verify with web-first assertions
+    await expect(page.getByRole('listitem')).toHaveCount(1);
+    await expect(page.getByRole('listitem').first()).toHaveText('New task');
+  });
+});
+```
+
+### Authentication Flow Test (No Auth State)
+```typescript
+test.describe('Authentication Flow', () => {
+  // Session cleanup for auth tests
+  test.beforeEach(async ({ page, context }) => {
+    await context.clearCookies();
+    await page.goto('about:blank');
+    await page.evaluate(() => {
+      try { localStorage.clear(); sessionStorage.clear(); } catch {}
+    });
+  });
+
+  test('should login successfully', async ({ page }) => {
+    console.log('🚀 Starting authentication test...');
+    
+    // Navigate and let app handle redirects
+    await page.goto('https://app.com');
+    await page.waitForLoadState('networkidle');
+    
+    // Fill credentials (role-based + .first())
+    await page.getByRole('textbox', { name: 'Email' }).first().fill('user@example.com');
+    await page.getByRole('textbox', { name: 'Password' }).first().fill('password');
+    await page.getByRole('button', { name: 'Sign in' }).first().click();
+    
+    // Verify success with web-first assertions
+    await expect(page.getByRole('button', { name: /profile|account/i })).toBeVisible();
+    
+    console.log('✅ Authentication completed');
+  });
+});
+```
+
+## Popup Handling Pattern
+
+```typescript
+// Set up popup listener BEFORE clicking trigger
+const popupPromise = page.waitForEvent('popup');
+await page.getByRole('button', { name: 'Open' }).first().click();
+
+// Handle popup
+const popup = await popupPromise;
+console.log('Popup opened:', popup.url());
+
+// Let popup navigate naturally (don't force goto)
+await popup.waitForLoadState('networkidle');
+
+// Check if popup auto-closed (common behavior)
+if (popup.isClosed()) {
+  console.log('✅ Popup auto-closed - operation completed');
+  return;
+}
+```
+
+## Authentication Flow Pattern
+
+```typescript
+test('Authentication Flow', async ({ page }) => {
+  // Navigate to app (auto-redirects to auth if needed)
+  await page.goto('https://app.com');
+  await page.waitForLoadState('networkidle');
+  
+  // Check if redirected to auth provider
+  if (page.url().includes('auth') || page.url().includes('cognito')) {
+    console.log('🔄 Authentication redirect detected');
+    
+    // Fill credentials (role-based + .first())
+    await page.getByRole('textbox', { name: 'name@host.com' }).first().fill('email@example.com');
+    await page.getByRole('textbox', { name: 'Password' }).first().fill('password');
+    await page.getByRole('button', { name: 'submit' }).first().click();
+    
+    // Wait for redirect back to app
+    await page.waitForURL('https://app.com/');
+  }
+  
+  // Verify successful login
+  await expect(page.getByRole('button', { name: /profile|account/i }).first()).toBeVisible();
+});
+```
+
+## Error Handling & Debugging
+
+```typescript
+test('Test with Error Handling', async ({ page }) => {
+  let testSuccess = false;
+  
+  try {
+    console.log('🚀 Step 1: Navigation');
+    // Test steps...
+    
+    console.log('✅ Step 2: Interaction');
+    // More steps...
+    
+    testSuccess = true;
+    
+  } catch (error) {
+    console.log('❌ Test failed:', error.message);
+    
+    // Debug screenshot
+    try {
+      await page.screenshot({ path: `debug-${Date.now()}.png` });
+    } catch {}
+    
+    throw error;
+  }
+  
+  expect(testSuccess).toBe(true);
+});
+```
+
+## Debugging & Maintenance
+
+### Development & Debugging Tools
+```typescript
+// Focus on specific test during development
+test.only('debug this test', async ({ page }) => {
+  // Test code
+});
+
+// Mark slow tests
+test.slow();
+
+// Enable tracing and video for debugging
+test('complex test', async ({ page }) => {
+  // Playwright automatically records video/traces on failure
+});
+
+// Manual screenshot for debugging
+try {
+  await page.screenshot({ path: `debug-${Date.now()}.png` });
+} catch {}
+```
+
+### Cross-Browser Testing
+```typescript
+// In playwright.config.js - test critical paths across browsers
+export default defineConfig({
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+  ],
+});
+```
+
+## Key Rules Summary
+
+### ✅ ALWAYS DO:
+- **🚨 MANDATORY: Use `:visible` selector when prompt mentions "fill visible element only"**
+- **🚨 MANDATORY: Use browser_evaluate to inspect HTML before generating test code**
+- **🚨 MANDATORY: Copy EXACT role selectors from MCP browser snapshots**  
+- **🚨 MANDATORY: Use EXACT selectors from MCP snapshots** (getByRole, getByPlaceholder, etc. based on what MCP shows)
+- **🚨 MANDATORY: Add `.first()` to ALL selectors** (strict mode compliance)
+- **Understand the user's intent first** - Testing vs Automation vs Code Examples
+- **Use role-based selectors first** (`getByRole`, `getByText`, `getByLabel`)
+- **Use appropriate tools for the task**:
+  - MCP browser tools for immediate automation
+  - Test files for testing scenarios  
+  - Code snippets for examples
+- **Use web-first assertions** for tests (`toBeVisible()`, `toHaveText()`, `toHaveCount()`)
+- **Test user-visible behavior**, not implementation details (in tests)
+- **Use `test.use({ storageState })` for auth** across test suites (in tests)
+- **Clear session data** for authentication tests only (in tests)
+- **Use network-aware waiting** (`waitForLoadState('networkidle')`)
+- **Let apps handle redirects naturally**
+- **Group related tests** with `test.describe` (in tests)
+- **Use dynamic test data** when possible
+
+### 🔧 MANDATORY MCP INSPECTION WORKFLOW:
+```typescript
+// 1. Navigate to form
+await mcp_playwright_browser_navigate({ url });
+await mcp_playwright_browser_wait_for({ time: 3 });
+
+// 2. INSPECT ELEMENTS (MANDATORY)
+await mcp_playwright_browser_evaluate({
+  function: `() => Array.from(document.querySelectorAll('input, button')).map(el => ({
+    tagName: el.tagName,
+    type: el.type, 
+    name: el.name,
+    placeholder: el.placeholder,
+    value: el.value,
+    ariaLabel: el.getAttribute('aria-label'),
+    textContent: el.textContent?.trim(),
+    visible: el.offsetWidth > 0 && el.offsetHeight > 0  // Check visibility
+  }))`
+});
+
+// 3. Test MCP selectors work
+await mcp_playwright_browser_type({
+  element: 'Email textbox',
+  ref: 'e19',  // From snapshot
+  text: 'test@example.com'
+});
+
+// 4. Generate Playwright code using EXACT selectors from MCP snapshots:
+// 🚨 IF PROMPT SAYS "VISIBLE ELEMENT ONLY" - USE :visible SELECTOR
+// MCP snapshot shows duplicates: use :visible to target only visible elements
+await page.locator('input[name="username"]:visible').first().fill(email);
+await page.locator('input[name="password"]:visible').first().fill(password);
+await page.locator('input[type="submit"]:visible').first().click();
+
+// OTHERWISE use standard MCP-to-Playwright translation:
+// MCP snapshot shows: textbox [ref=e19] /placeholder: name@host.com
+await page.getByPlaceholder('name@host.com').first().fill(email);
+// MCP snapshot shows: button "submit" [ref=e25]  
+await page.getByRole('button', { name: 'submit' }).first().click();
+```
+
+### ❌ NEVER DO:
+- **🚨 CREATE EXTRA TEST CASES** unless explicitly requested - STICK TO EXACT SCOPE!
+- **🚨 ADD "HELPFUL" FEATURES** beyond what user asked for
+- **🚨 CREATE COMPREHENSIVE SUITES** when user wants simple code
+- **Assume user wants tests** when they ask for automation
+- **Create test files** when user wants immediate browser actions
+- **Use MCP tools** when user wants test code examples
+- Use arbitrary timeouts (`waitForTimeout`)
+- Hardcode dynamic URLs or test data
+- Share state between tests (in tests)
+- Use `page.evaluate()` when Playwright methods exist
+- Test implementation details (in tests)
+- Skip `.first()` on selectors
+- Use manual property checks instead of web-first assertions (in tests)
+
+### 🔍 DEBUGGING TIPS:
+- Use `test.only()` to focus on specific tests
+- Check error context for exact element names
+- Trust role-based selectors - fix wait conditions instead
+- Use Playwright's built-in tracing and video recording
+- Verify element counts when strict mode fails
+- Add descriptive test names for easier debugging
+
+### 📁 FILE ORGANIZATION:
+- Store tests in `tests/` folder
+- Name files by system component (not React component)
+- Use descriptive test names explaining functionality
+- Group related tests with `test.describe`
+
+## 🎯 FINAL REMINDER: TASK SCOPE RULE
+
+**CRITICAL: Only create exactly what the user requests:**
+
+### When User Says:
+- **"Generate code for login"** → ONE simple login test only
+- **"Test login flow"** → ONE login test (not login + navigation + verification)
+- **"Navigate and fill form"** → Use MCP tools for automation
+- **"Create comprehensive tests"** → Then create multiple tests
+- **"Show me how to..."** → Code example only
+
+### Context Clues for Intent
+- **"Test"** → Usually wants test file
+- **"Navigate/Login/Fill/Click"** → Usually wants automation  
+- **"How to/Show me/Code for"** → Usually wants examples
+- **"Generate code"** → Could be any - look at context
+
+### 🚨 REMEMBER: 
+**If user asks for 3 steps, create code for 3 steps - NOT 10 steps with extra features!**
+
+---
+
+*Choose the right tool for the user's actual intent. Stick to exact scope. No assumptions.*

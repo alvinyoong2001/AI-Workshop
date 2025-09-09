@@ -1,0 +1,17 @@
+{
+  "name": "playwright-mcp",
+  "version": "1.0.0",
+  "description": "Playwright MCP integration for Cursor",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "install:browsers": "playwright install"
+  },
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.36",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.3.0"
+  }
+}

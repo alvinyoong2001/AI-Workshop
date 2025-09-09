@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "@playwright/mcp"
+      ],
+      "env": {
+        "PLAYWRIGHT_HEADLESS": "false",
+        "PLAYWRIGHT_BROWSER": "chromium"
+      }
+    }
+  }
+}
+

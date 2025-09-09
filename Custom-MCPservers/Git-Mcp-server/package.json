@@ -1,0 +1,30 @@
+{
+  "name": "git-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for Git operations and pull request management",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test-story-analysis": "node test-story-analysis.js",
+    "test-checkout": "node test-checkout-repository.js",
+    "test-auth": "node test-authentication.js",
+    "test-enhanced": "node test-enhanced-analysis.js",
+    "test-oauth": "node test-oauth.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "simple-git": "^3.22.0",
+    "express": "^4.18.2",
+    "open": "^9.1.0",
+    "crypto": "^1.0.1",
+    "node-fetch": "^3.3.2",
+    "js-base64": "^3.7.5"
+  },
+  "keywords": ["mcp", "git", "pull-request", "github", "bitbucket"],
+  "author": "",
+  "license": "MIT"
+} 
